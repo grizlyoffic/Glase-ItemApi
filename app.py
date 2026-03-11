@@ -6,28 +6,32 @@ from PIL import Image
 
 app = Flask(__name__)
 
-BACKGROUND_FOLDER = "background"
-DEFAULT_BACKGROUND = "background/Default.png"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+BACKGROUND_FOLDER = os.path.join(BASE_DIR, "background")
+DEFAULT_BACKGROUND = os.path.join(BACKGROUND_FOLDER, "white.jpg")
 
 
 def get_item_info(item_id):
     url = f"https://item-info-neon.vercel.app/info?item_id={item_id}"
-    r = requests.get(url)
-
-    if r.status_code != 200:
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except:
         return None
-
-    return r.json()
+    return None
 
 
 def get_icon(item_id):
     url = f"https://item-info-neon.vercel.app/icon?item_id={item_id}"
-    r = requests.get(url)
-
-    if r.status_code != 200:
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            return Image.open(io.BytesIO(r.content)).convert("RGBA")
+    except:
         return None
-
-    return Image.open(io.BytesIO(r.content)).convert("RGBA")
+    return None
 
 
 @app.route("/ICON/<int:item_id>.png")
@@ -36,7 +40,7 @@ def generate_icon(item_id):
     info = get_item_info(item_id)
 
     if not info:
-        return jsonify({"error": "Item not found"}), 404
+        return jsonify({"error": "Item info not found"}), 404
 
     rare = info.get("Rare", "Default")
 
@@ -45,7 +49,10 @@ def generate_icon(item_id):
     if not os.path.exists(bg_path):
         bg_path = DEFAULT_BACKGROUND
 
-    background = Image.open(bg_path).convert("RGBA")
+    try:
+        background = Image.open(bg_path).convert("RGBA")
+    except:
+        return jsonify({"error": "Background not found"}), 500
 
     icon = get_icon(item_id)
 
@@ -85,5 +92,5 @@ def generate_icon(item_id):
     return send_file(img_bytes, mimetype="image/png")
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+# Vercel entry
+app = app
